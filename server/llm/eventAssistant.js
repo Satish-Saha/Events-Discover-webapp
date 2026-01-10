@@ -30,9 +30,10 @@ async function callLLM({ userMessage, events }) {
       **Date:** [Date string]
       **Location:** [Location string]
       **Why:** [Short reason]
-      [Click for Details]([URL])
+      [Click for Details]([URL]?eventId=[EVENT_ID])
 
     - Do NOT use "Title:", "URL:" labels textually. Use the format above.
+    - Always include eventId parameter in the URL for proper tracking.
     - If suggesting multiple events, separate them with a horizontal rule (---).
     - Be concise.
     
@@ -42,6 +43,7 @@ async function callLLM({ userMessage, events }) {
     `;
 
     const eventsForPrompt = events.map((e) => ({
+        id: e._id.toString(),
         title: e.title,
         date: e.date,
         location: e.location,

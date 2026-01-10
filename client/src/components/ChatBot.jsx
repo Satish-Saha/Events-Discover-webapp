@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FaRobot, FaPaperPlane } from 'react-icons/fa';
-import { chatWithAssistant } from '../services/api';
+import { chatWithAssistant, fetchEvents } from '../services/api';
 import ReactMarkdown from 'react-markdown';
+import EmailModal from './EmailModal';
 
 export default function ChatBot() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'Hi! I can help you choose events. Ask me anything like “What’s happening this weekend?”' },
+    { role: 'assistant', text: 'Hi! I can help you choose events. Ask me anything like "What\'s happening this weekend?"' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const chatEndRef = useRef(null);
 
   const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -16,6 +20,19 @@ export default function ChatBot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      const data = await fetchEvents();
+      setEvents(data);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -48,6 +65,31 @@ export default function ChatBot() {
     }
   };
 
+  const handleLinkClick = (url) => {
+    try {
+      const urlObj = new URL(url);
+      const eventId = urlObj.searchParams.get('eventId');
+      
+      if (eventId) {
+        const event = events.find(e => e._id === eventId);
+        if (event) {
+          setSelectedEvent(event);
+          setIsModalOpen(true);
+          return;
+        }
+      }
+      
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedEvent(null);
+  };
+
   return (
     <div className="flex flex-col h-full max-h-[600px] bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
       {/* Header */}
@@ -75,7 +117,14 @@ export default function ChatBot() {
                 <ReactMarkdown
                   components={{
                     a: ({ node, ...props }) => (
-                      <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline" />
+                      <a 
+                        {...props} 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleLinkClick(props.href);
+                        }}
+                        className="text-blue-500 hover:underline cursor-pointer" 
+                      />
                     ),
                   }}
                 >
@@ -114,6 +163,12 @@ export default function ChatBot() {
           <FaPaperPlane />
         </button>
       </div>
+      
+      <EmailModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        event={selectedEvent}
+      />
     </div>
   );
 }
