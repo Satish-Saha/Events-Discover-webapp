@@ -6,12 +6,13 @@ const Otp = require('../models/Otp');
 const { handleUserMessage } = require('../llm/eventAssistant');
 const nodemailer = require('nodemailer');
 
-// Email Transporter Setup
+// Brevo (Sendinblue) Transporter
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp-relay.brevo.com',
+  port: 587,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS
   }
 });
 
@@ -46,32 +47,32 @@ router.post('/send-otp', async (req, res) => {
     const newOtp = new Otp({ email, otp });
     await newOtp.save();
 
-    // Send Email
+    if (!process.env.BREVO_USER || !process.env.BREVO_PASS) {
+      throw new Error('Email credentials (BREVO_USER/PASS) missing in environment variables');
+    }
+
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
+      from: `"Event App" <${process.env.BREVO_SENDER}>`,
+      to: email, // Receiver
       subject: 'Your Verification Code',
-      text: `Your verification code is: ${otp}. It expires in 5 minutes.`
+      html: `
+        <h3>Your Verification Code</h3>
+        <p>Use this code to verify your email address:</p>
+        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3b82f6;">${otp}</p>
+        <p>It expires in 5 minutes.</p>
+      `
     };
 
-    try {
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        await transporter.sendMail(mailOptions);
-        console.log(`OTP sent to ${email}`);
-      } else {
-        throw new Error('No email credentials provided');
-      }
-    } catch (emailErr) {
-      console.error('Failed to send email (using console fallback):', emailErr.message);
-      // Fallback for demo/dev: Log OTP to console so flow isn't blocked
-      console.log(`[DEV FALLBACK] OTP for ${email}: ${otp}`);
-    }
+    await transporter.sendMail(mailOptions);
+    console.log(`OTP sent to ${email} (via Brevo)`);
 
     res.status(200).json({ message: 'OTP sent successfully' });
 
   } catch (err) {
     console.error('Send OTP Error:', err);
-    res.status(500).json({ message: 'Failed to send OTP' });
+    // Clean error message for client
+    const msg = err.message || 'Internal Server Error';
+    res.status(500).json({ message: `Failed to send OTP email: ${msg}` });
   }
 });
 
@@ -82,15 +83,16 @@ router.post('/verify-otp', async (req, res) => {
 
   try {
     const record = await Otp.findOne({ email, otp });
+
     if (!record) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
+      // Logic for simplicity: If not found, it's invalid or expired.
+      return res.status(401).json({ message: 'Invalid or expired OTP' });
     }
 
     // OTP is valid
-    // Ideally, we might want to delete it now so it can't be reused
     await Otp.deleteOne({ _id: record._id });
 
-    // Check if subscriber exists, if not, create one (similar to original subscribe flow)
+    // Check if subscriber exists, if not, create one
     let subscriber = await Subscriber.findOne({ email });
     if (!subscriber) {
       subscriber = new Subscriber({ email });
@@ -107,7 +109,6 @@ router.post('/verify-otp', async (req, res) => {
 
 // POST /api/subscribe 
 router.post('/subscribe', async (req, res) => {
-
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email is required' });
 

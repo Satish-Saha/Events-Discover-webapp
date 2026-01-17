@@ -17,28 +17,10 @@ const TELEGRAM_API = TELEGRAM_TOKEN
     : null;
 
 // Middleware
-const allowedOrigins = [
-    process.env.CLIENT_URL,
-    'http://localhost:5173', // Vite default port
-    'http://localhost:3000'  // React default port
-].filter(Boolean); // Remove empty values
-
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
-            callback(null, true);
-        } else {
-            // For debugging deployment, you might temporarily uncomment this:
-            // console.log('Blocked Origin:', origin);
-            // return callback(null, true); // Allow all temporarily
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true // Important for cookies/sessions if used
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
