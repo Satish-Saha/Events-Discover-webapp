@@ -9,7 +9,8 @@ const nodemailer = require('nodemailer');
 // Brevo (Sendinblue) Transporter
 const transporter = nodemailer.createTransport({
   host: 'smtp-relay.brevo.com',
-  port: 587,
+  port: 465, // Port 465 is often more reliable on cloud hosting than 587
+  secure: true, // true for 465, false for other ports
   auth: {
     user: process.env.BREVO_USER,
     pass: process.env.BREVO_PASS
