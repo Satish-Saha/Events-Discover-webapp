@@ -4,21 +4,22 @@ const Event = require('../models/Event');
 const Subscriber = require('../models/Subscriber');
 const Otp = require('../models/Otp');
 const { handleUserMessage } = require('../llm/eventAssistant');
-const nodemailer = require('nodemailer');
+// const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 // Brevo (Sendinblue) Transporter
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: 'apikey',
-    pass: process.env.BREVO_PASS
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000
-});
+// const transporter = nodemailer.createTransport({
+//   host: 'smtp-relay.brevo.com',
+//   port: 587,
+//   secure: false,
+//   auth: {
+//     user: 'apikey',
+//     pass: process.env.BREVO_PASS
+//   },
+//   connectionTimeout: 10000,
+//   greetingTimeout: 10000,
+//   socketTimeout: 10000
+// });
 
 // Helper to generate 6-digit OTP
 const generateOTP = () => {
@@ -51,23 +52,55 @@ router.post('/send-otp', async (req, res) => {
     const newOtp = new Otp({ email, otp });
     await newOtp.save();
 
-    if (!process.env.BREVO_PASS) {
-      throw new Error('Email credentials (BREVO_PASS) missing');
+    // if (!process.env.BREVO_PASS) {
+    //   throw new Error('Email credentials (BREVO_PASS) missing');
+    // }
+
+    // const mailOptions = {
+    //   from: `"Event App" <${process.env.BREVO_SENDER}>`,
+    //   to: email, // Receiver
+    //   subject: 'Your Verification Code',
+    //   html: `
+    //     <h3>Your Verification Code</h3>
+    //     <p>Use this code to verify your email address:</p>
+    //     <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3b82f6;">${otp}</p>
+    //     <p>It expires in 5 minutes.</p>
+    //   `
+    // };
+
+    // await transporter.sendMail(mailOptions);
+
+    if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER) {
+      throw new Error('Brevo API key or sender missing');
     }
 
-    const mailOptions = {
-      from: `"Event App" <${process.env.BREVO_SENDER}>`,
-      to: email, // Receiver
-      subject: 'Your Verification Code',
-      html: `
-        <h3>Your Verification Code</h3>
-        <p>Use this code to verify your email address:</p>
-        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3b82f6;">${otp}</p>
-        <p>It expires in 5 minutes.</p>
-      `
-    };
+    await axios.post(
+      'https://api.brevo.com/v3/smtp/email',
+      {
+        sender: {
+          name: 'Event App',
+          email: process.env.BREVO_SENDER
+        },
+        to: [{ email }],
+        subject: 'Your Verification Code',
+        htmlContent: `
+      <h3>Your Verification Code</h3>
+      <p>Use this code to verify your email address:</p>
+      <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3b82f6;">
+        ${otp}
+      </p>
+      <p>It expires in 5 minutes.</p>
+    `
+      },
+      {
+        headers: {
+          'api-key': process.env.BREVO_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
 
-    await transporter.sendMail(mailOptions);
     console.log(`OTP sent to ${email} (via Brevo)`);
 
     res.status(200).json({ message: 'OTP sent successfully' });
