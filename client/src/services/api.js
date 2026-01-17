@@ -19,4 +19,14 @@ export const chatWithAssistant = async (message) => {
     return response.data;
 };
 
+export const sendOtp = async (email) => {
+    const response = await api.post('/send-otp', { email });
+    return response.data;
+};
+
+export const verifyOtp = async (email, otp) => {
+    const response = await api.post('/verify-otp', { email, otp });
+    return response.data;
+};
+
 export default api;
