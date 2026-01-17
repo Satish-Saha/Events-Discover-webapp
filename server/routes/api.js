@@ -9,12 +9,15 @@ const nodemailer = require('nodemailer');
 // Brevo (Sendinblue) Transporter
 const transporter = nodemailer.createTransport({
   host: 'smtp-relay.brevo.com',
-  port: 465, // Port 465 is often more reliable on cloud hosting than 587
-  secure: true, // true for 465, false for other ports
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.BREVO_USER,
+    user: 'apikey',
     pass: process.env.BREVO_PASS
-  }
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 // Helper to generate 6-digit OTP
@@ -48,8 +51,8 @@ router.post('/send-otp', async (req, res) => {
     const newOtp = new Otp({ email, otp });
     await newOtp.save();
 
-    if (!process.env.BREVO_USER || !process.env.BREVO_PASS) {
-      throw new Error('Email credentials (BREVO_USER/PASS) missing in environment variables');
+    if (!process.env.BREVO_PASS) {
+      throw new Error('Email credentials (BREVO_PASS) missing');
     }
 
     const mailOptions = {
